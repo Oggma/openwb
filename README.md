@@ -1,3 +1,11 @@
-# Fullstack Authentication Example with Next.js and NextAuth.js
+## Prisma ORM
 
-This is the starter project for the fullstack tutorial with Next.js and Prisma. You can find the final version of this project in the [`final`](https://github.com/prisma/blogr-nextjs-prisma/tree/final) branch of this repo.
+PostreSQL url schema: ```postgresql://USER:PASSWORD@HOST:PORT/DATABASE?KEY1=VALUE&KEY2=VALUE&KEY3=VALUE```
+
+Open Prisma Studio: ```npx prisma studio```
+
+Add DB migration: ```npx prisma migrate dev --name init```
+
+Force DB update based on schema: ```npx prisma db push```
+
+Update Prisma Client: ```npx prisma generate```
