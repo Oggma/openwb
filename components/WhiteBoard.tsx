@@ -86,10 +86,12 @@ const WhiteBoard: React.FC<Props> = (props) => {
     } else {
       const previousSelection = selectedNote;
       const previousNoteText = selectedNoteText;
-      previousSelection.selected = false;
-      previousSelection.text = previousNoteText;
+      if (previousSelection) {
+        previousSelection.selected = false;
+        previousSelection.text = previousNoteText;
 
-      drawNoteText(ctx, previousSelection);
+        drawNoteText(ctx, previousSelection);
+      }
 
       setSelectedNote(null);
       setSelectedNoteText('');
