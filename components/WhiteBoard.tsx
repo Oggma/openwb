@@ -1,11 +1,9 @@
-import React, {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useRef, useState } from "react";
 
-type Props = {
-};
+import io from "Socket.IO-client";
+let socket;
+
+type Props = {};
 
 type Note = {
   x: number;
@@ -38,17 +36,17 @@ const WhiteBoard: React.FC<Props> = (props) => {
 
     // start with a large font size
     var fontsize = 300;
-    const fontface = 'Arial';
+    const fontface = "Arial";
 
     // lower the font size until the text fits the canvas
     do {
       fontsize--;
       ctx.font = fontsize + "px " + fontface;
-    } while (ctx.measureText(note.text).width > note.w - 10)
+    } while (ctx.measureText(note.text).width > note.w - 10);
 
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = "black";
     ctx.fillText(note.text, note.x + 10, note.y + note.h / 2);
-  }
+  };
 
   const createNote = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
     if (
@@ -59,16 +57,34 @@ const WhiteBoard: React.FC<Props> = (props) => {
       return;
     }
 
-    notes.push({
+    const newNote = {
       x: x,
       y: y,
       h: 100,
       w: 100,
       text: "",
       selected: false,
-    });
+    };
+
+    notes.push(newNote);
+
+    socket.emit("create-note", newNote);
 
     drawNote(ctx, x, y);
+  };
+
+  const handleUpdateNotes = (note: Note) => {
+    if (
+      notes.some(
+        (n) => note.x >= n.x && note.x <= n.x + n.w && note.y >= n.y && note.y <= n.y + n.h
+      )
+    ) {
+      return;
+    }
+
+    notes.push(note);
+
+    drawNote(context, note.x, note.y);
   };
 
   const selectNote = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
@@ -82,7 +98,12 @@ const WhiteBoard: React.FC<Props> = (props) => {
       setSelectedNoteText(selectedNoteLocal.text);
 
       ctx.fillStyle = "#FFFFBC";
-      ctx.fillRect(selectedNoteLocal.x, selectedNoteLocal.y, selectedNoteLocal.w, selectedNoteLocal.h);
+      ctx.fillRect(
+        selectedNoteLocal.x,
+        selectedNoteLocal.y,
+        selectedNoteLocal.w,
+        selectedNoteLocal.h
+      );
     } else {
       const previousSelection = selectedNote;
       const previousNoteText = selectedNoteText;
@@ -94,12 +115,12 @@ const WhiteBoard: React.FC<Props> = (props) => {
       }
 
       setSelectedNote(null);
-      setSelectedNoteText('');
+      setSelectedNoteText("");
     }
   };
 
   const [selectedNote, setSelectedNote] = useState<Note>(null);
-  const [selectedNoteText, setSelectedNoteText] = useState<string>('');
+  const [selectedNoteText, setSelectedNoteText] = useState<string>("");
 
   const drawBackground = (ctx: CanvasRenderingContext2D) => {
     ctx.fillStyle = "#FCFBF9";
@@ -133,15 +154,32 @@ const WhiteBoard: React.FC<Props> = (props) => {
     canvas.height = canvas.offsetHeight;
   };
 
+  let context;
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
+    context = canvas.getContext("2d");
 
     fitToContainer(canvas);
 
     drawBackground(context);
     drawGrid(context, 50);
+
+    socketInitializer();
   }, []);
+
+  const socketInitializer = async () => {
+    await fetch("/api/socket");
+    socket = io();
+
+    socket.on("connect", () => {
+      console.log("connected");
+    });
+
+    socket.on('update-notes', msg => {
+      handleUpdateNotes(msg as Note);
+    })
+  };
 
   const onCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     var rect = event.currentTarget.getBoundingClientRect();
@@ -151,8 +189,7 @@ const WhiteBoard: React.FC<Props> = (props) => {
     };
 
     const ctx = event.currentTarget.getContext("2d");
-    if (isCreateMode)
-      createNote(ctx, position.x, position.y);
+    if (isCreateMode) createNote(ctx, position.x, position.y);
     else if (isSelectMode) selectNote(ctx, position.x, position.y);
   };
 
@@ -208,7 +245,11 @@ const WhiteBoard: React.FC<Props> = (props) => {
             height: selectedNote.h + 30,
           }}
         >
-          <textarea rows={3} value={selectedNoteText} onChange={(event) => setSelectedNoteText(event.currentTarget.value)}/>
+          <textarea
+            rows={3}
+            value={selectedNoteText}
+            onChange={(event) => setSelectedNoteText(event.currentTarget.value)}
+          />
         </div>
       )}
 
