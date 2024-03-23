@@ -1,6 +1,6 @@
 {
-  "name": "hello-next",
-  "version": "1.0.0",
+  "name": "openwb",
+  "version": "0.0.1-alfa",
   "description": "",
   "scripts": {
     "dev": "next",
