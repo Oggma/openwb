@@ -1,169 +1,38 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import io from "Socket.IO-client";
+import CanvasBoard, { ToolbarNodeType } from "../models/board/canvas/CanvasBoard";
+import RectNode from "../models/board/base/RectNode";
+import RectTextNode from "../models/board/base/RectTextNode";
 let socket;
 
 type Props = {};
-
-type Note = {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  text: string;
-  selected: boolean;
-};
+let canvasBoard: CanvasBoard;
 
 const WhiteBoard: React.FC<Props> = (props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const maxHeight = 10000;
-  const maxWidth = 10000;
+  const getCanvas = () => canvasRef.current;
 
-  const [notes, setNotes] = useState<Note[]>([]);
+  const selectNodeHandler = (node: RectNode) => {
+    setSelectedNode(node);
 
-  const drawNote = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "#000000";
-    ctx.strokeRect(x, y, 100, 100);
-
-    ctx.fillStyle = "#FFFFBC";
-    ctx.fillRect(x, y, 100, 100);
-  };
-
-  const drawNoteText = (ctx: CanvasRenderingContext2D, note: Note) => {
-    ctx.fillStyle = "#FFFFBC";
-    ctx.fillRect(note.x, note.y, note.w, note.h);
-
-    // start with a large font size
-    var fontsize = 300;
-    const fontface = "Arial";
-
-    // lower the font size until the text fits the canvas
-    do {
-      fontsize--;
-      ctx.font = fontsize + "px " + fontface;
-    } while (ctx.measureText(note.text).width > note.w - 10);
-
-    ctx.fillStyle = "black";
-    ctx.fillText(note.text, note.x + 10, note.y + note.h / 2);
-  };
-
-  const createNote = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
-    if (
-      notes.some(
-        (n) => x >= n.x && x <= n.x + n.w && y >= n.y && y <= n.y + n.h
-      )
-    ) {
-      return;
-    }
-
-    const newNote = {
-      x: x,
-      y: y,
-      h: 100,
-      w: 100,
-      text: "",
-      selected: false,
-    };
-
-    notes.push(newNote);
-
-    socket.emit("create-note", newNote);
-
-    drawNote(ctx, x, y);
-  };
-
-  const handleUpdateNotes = (note: Note) => {
-    if (
-      notes.some(
-        (n) => note.x >= n.x && note.x <= n.x + n.w && note.y >= n.y && note.y <= n.y + n.h
-      )
-    ) {
-      return;
-    }
-
-    notes.push(note);
-
-    drawNote(context, note.x, note.y);
-  };
-
-  const selectNote = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
-    const selectedNoteLocal = notes.find(
-      (n) => x >= n.x && x <= n.x + n.w && y >= n.y && y <= n.y + n.h
-    );
-
-    if (selectedNoteLocal) {
-      selectedNoteLocal.selected = true;
-      setSelectedNote(selectedNoteLocal);
-      setSelectedNoteText(selectedNoteLocal.text);
-
-      ctx.fillStyle = "#FFFFBC";
-      ctx.fillRect(
-        selectedNoteLocal.x,
-        selectedNoteLocal.y,
-        selectedNoteLocal.w,
-        selectedNoteLocal.h
-      );
-    } else {
-      const previousSelection = selectedNote;
-      const previousNoteText = selectedNoteText;
-      if (previousSelection) {
-        previousSelection.selected = false;
-        previousSelection.text = previousNoteText;
-
-        drawNoteText(ctx, previousSelection);
-      }
-
-      setSelectedNote(null);
-      setSelectedNoteText("");
+    if (node instanceof RectTextNode) {
+      setSelectedNodeText(node.text);
     }
   };
 
-  const [selectedNote, setSelectedNote] = useState<Note>(null);
-  const [selectedNoteText, setSelectedNoteText] = useState<string>("");
-
-  const drawBackground = (ctx: CanvasRenderingContext2D) => {
-    ctx.fillStyle = "#FCFBF9";
-    ctx.fillRect(0, 0, maxWidth, maxHeight);
-  };
-
-  const drawGrid = (ctx: CanvasRenderingContext2D, sideSize: number) => {
-    ctx.beginPath();
-
-    ctx.lineWidth = 0.01;
-
-    const colsNumber = Math.round(maxWidth / sideSize);
-    for (var i = 1; i <= colsNumber; i++) {
-      ctx.moveTo(sideSize * i, 0);
-      ctx.lineTo(sideSize * i, maxHeight);
-      ctx.stroke();
-    }
-
-    const rowsNumber = Math.round(maxHeight / sideSize);
-    for (var i = 1; i <= rowsNumber; i++) {
-      ctx.moveTo(0, sideSize * i);
-      ctx.lineTo(maxWidth, sideSize * i);
-      ctx.stroke();
-    }
-  };
-
-  const fitToContainer = (canvas: HTMLCanvasElement) => {
+  const fitCanvasToContainer = () => {
+    const canvas = getCanvas();
     canvas.style.width = "100%";
     canvas.style.height = "100%";
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
   };
 
-  let context;
-
   useEffect(() => {
-    const canvas = canvasRef.current;
-    context = canvas.getContext("2d");
-
-    fitToContainer(canvas);
-
-    drawBackground(context);
-    drawGrid(context, 50);
+    fitCanvasToContainer();
+    canvasBoard = new CanvasBoard(getCanvas());
+    canvasBoard.onNodeSelect(selectNodeHandler)
 
     socketInitializer();
   }, []);
@@ -175,36 +44,26 @@ const WhiteBoard: React.FC<Props> = (props) => {
     socket.on("connect", () => {
       console.log("connected");
     });
-
-    socket.on('update-notes', msg => {
-      handleUpdateNotes(msg as Note);
-    })
   };
 
   const onCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    var rect = event.currentTarget.getBoundingClientRect();
-    const position = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
-
-    const ctx = event.currentTarget.getContext("2d");
-    if (isCreateMode) createNote(ctx, position.x, position.y);
-    else if (isSelectMode) selectNote(ctx, position.x, position.y);
+    canvasBoard.handleCanvasClick(event);
   };
 
-  const [isSelectMode, setSelectMode] = useState(true);
-  const [isCreateMode, setCreateMode] = useState(false);
+  const [toolbarNodeType, setToolbarNodeType] = useState(ToolbarNodeType.Select);
+  const [selectedNodeText, setSelectedNodeText] = useState<string>("");
+  const [selectedNode, setSelectedNode] = useState<RectNode>(null);
 
   return (
     <div id="board-root">
       <div className="left-menu">
         <div>
           <button
-            className={isSelectMode ? "__selected" : ""}
+            className={toolbarNodeType === ToolbarNodeType.Select ? "__selected" : ""}
             onClick={() => {
-              setSelectMode(true);
-              setCreateMode(false);
+              console.log(canvasBoard);
+              setToolbarNodeType(ToolbarNodeType.Select);
+              canvasBoard.selectedToolbarNodeType = ToolbarNodeType.Select;
             }}
           >
             Select
@@ -212,10 +71,10 @@ const WhiteBoard: React.FC<Props> = (props) => {
         </div>
         <div>
           <button
-            className={isCreateMode ? "__selected" : ""}
+            className={toolbarNodeType === ToolbarNodeType.StickyNote ? "__selected" : ""}
             onClick={() => {
-              setSelectMode(false);
-              setCreateMode(true);
+              setToolbarNodeType(ToolbarNodeType.StickyNote);
+              canvasBoard.selectedToolbarNodeType = ToolbarNodeType.StickyNote;
             }}
           >
             Note
@@ -235,20 +94,25 @@ const WhiteBoard: React.FC<Props> = (props) => {
           }}
         />
       </div>
-      {selectedNote && (
+      {selectedNode && (
         <div
           className="note-box"
           style={{
-            top: selectedNote.y - 15,
-            left: selectedNote.x - 15,
-            width: selectedNote.w + 30,
-            height: selectedNote.h + 30,
+            top: selectedNode.y - 15,
+            left: selectedNode.x - 15,
+            width: selectedNode.w + 30,
+            height: selectedNode.h + 30,
           }}
         >
           <textarea
             rows={3}
-            value={selectedNoteText}
-            onChange={(event) => setSelectedNoteText(event.currentTarget.value)}
+            value={selectedNodeText}
+            onChange={(event) => {
+              setSelectedNodeText(event.currentTarget.value);
+              if (selectedNode instanceof RectTextNode) {
+                selectedNode.text = event.currentTarget.value;
+              }
+            }}
           />
         </div>
       )}
