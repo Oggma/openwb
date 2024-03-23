@@ -1,15 +1,11 @@
 import { GetServerSideProps } from "next";
 import Layout from "../components/Layout";
-import Home from "../components/Home";
+import WhiteBoard from "../components/WhiteBoard";
 
-const index = () => {
+const board = () => {
   return (
     <Layout>
-      <div>
-        <main>
-          <Home></Home>
-        </main>
-      </div>
+      <WhiteBoard></WhiteBoard>
     </Layout>
   );
 };
@@ -20,4 +16,4 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   };
 };
 
-export default index;
+export default board;
